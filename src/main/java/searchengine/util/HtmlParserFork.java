@@ -8,7 +8,6 @@ import org.springframework.http.HttpStatus;
 import searchengine.models.Page;
 import searchengine.models.Site;
 import searchengine.services.EntitiesService;
-import searchengine.services.impl.IndexingServiceImpl;
 
 import java.io.IOException;
 import java.net.SocketTimeoutException;
@@ -21,34 +20,33 @@ public class HtmlParserFork extends RecursiveAction {
     private Site site;
     private String link;
 
-    private AtomicBoolean stop;
 //    public static HashSet<String> resultPagesSet = new LinkedHashSet<>();
-//    public static AtomicBoolean stop = new AtomicBoolean();
+    public static AtomicBoolean stop = new AtomicBoolean(false);
     private FindLemmas findLemmas;
 
     public HtmlParserFork(EntitiesService entitiesService, Site site, String link) {
         this.entitiesService = entitiesService;
         this.site = site;
         this.link = link;
-        this.stop = IndexingServiceImpl.getStop();
     }
 
     @Override
     protected void compute() {
         try {
-//            if (StartThreadIndex.resultPagesSet.size() > 20) stop.set(true);
-            if (entitiesService.isLink(link) && stop.get() == false) {
-                List<String> linksList = parseLinks(link);
-                List<HtmlParserFork> tasks = new ArrayList<>();
-                if (!linksList.isEmpty()) {
-                    for (String link : linksList) {
-                        HtmlParserFork task = new HtmlParserFork(entitiesService, site, link);
-                        task.fork();
-                        tasks.add(task);
+            List<HtmlParserFork> tasks = new ArrayList<>();
+            if (stop.get() == false) {
+                if (entitiesService.isLink(link)) {
+                    List<String> linksList = parseLinks(link);
+                    if (!linksList.isEmpty()) {
+                        for (String link : linksList) {
+                            HtmlParserFork task = new HtmlParserFork(entitiesService, site, link);
+                            task.fork();
+                            tasks.add(task);
+                        }
                     }
+                    joinTasks(tasks);
                 }
-                joinTasks(tasks);
-            }
+            } else joinTasks(tasks);
         } catch (SocketTimeoutException ex) {
             System.out.println(ex + link);
         } catch (InterruptedException e) {
@@ -86,16 +84,8 @@ public class HtmlParserFork extends RecursiveAction {
         }
         StartThreadIndex.resultPagesSet.add(path);
         Page page = entitiesService.addPage(site, path, content, statusCode);
-        findLemmas(page);
+        if (stop.get() == false) entitiesService.findLemmasInPageText(page);
         return false;
-    }
-
-    public synchronized void findLemmas(Page page) {
-        findLemmas = new FindLemmas();
-        Document document = Jsoup.parse(page.getContent());
-        String text = document.title() + " " + document.body().text();
-        HashMap<String, Integer> lemmaList = findLemmas.getLemmasInMap(text);
-        entitiesService.addLemmaAndIndex(page, lemmaList);
     }
 
     public void joinTasks(List<HtmlParserFork> list) {

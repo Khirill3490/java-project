@@ -24,28 +24,30 @@ public class StartThreadIndex implements Runnable {
     @Override
     public void run() {
         ForkJoinPool pool = new ForkJoinPool();
-        Site site = getSiteModel(siteCfg, StatusEnum.INDEXING);
+        Site site = getSiteModel(siteCfg, StatusEnum.INDEXING, "");
         HtmlParserFork htmlParserFork = new HtmlParserFork(entitiesService, site, site.getUrl());
         pool.invoke(htmlParserFork);
         htmlParserFork.join();
         resultPagesSet.clear();
-//            HtmlParserFork.resultPagesSet.clear();
-        getSiteModel(siteCfg, StatusEnum.INDEXED);
+        if (HtmlParserFork.stop.get() == false) getSiteModel(siteCfg, StatusEnum.INDEXED, "");
+        else getSiteModel(siteCfg, StatusEnum.FAILED, "Индексация остановлена пользователем");
+
     }
 
-    public Site getSiteModel(searchengine.config.Site siteConfig, StatusEnum statusEnum) {
+    public Site getSiteModel(searchengine.config.Site siteConfig, StatusEnum statusEnum, String errMessage) {
         Optional<Site> siteOptional = siteRepository.findByName(siteConfig.getName());
         Site site = new Site();
         if (!siteOptional.isPresent()) {
             site.setName(siteConfig.getName());
             site.setUrl(siteConfig.getUrl().replaceAll("(www.)?", ""));
             site.setStatus(statusEnum);
-            site.setLastError("");
+            site.setLastError(errMessage);
             site.setStatusTime(new Date());
             siteRepository.save(site);
         } else {
             Site siteFromSql = siteOptional.get();
             siteFromSql.setStatus(statusEnum);
+            siteFromSql.setLastError(errMessage);
             siteRepository.save(siteFromSql);
         }
         return site;

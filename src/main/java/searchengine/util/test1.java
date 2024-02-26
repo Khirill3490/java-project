@@ -14,7 +14,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class test1 {
-    public static void main(String[] args) throws InterruptedException, IOException {
+    public static void main(String[] args) {
         try {
             // Подключение к веб-странице
             Document doc = Jsoup.connect("https://skillbox.ru/sale/main/").get();

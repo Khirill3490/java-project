@@ -1,5 +1,6 @@
 package searchengine.services.impl;
 
+import lombok.RequiredArgsConstructor;
 import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -22,35 +23,35 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
 @Service
+@RequiredArgsConstructor
 public class EntitiesServiceImpl implements EntitiesService {
 
     private final IndexRepository indexRepository;
     private final LemmaRepository lemmaRepository;
     private final PageRepository pageRepository;
     private final SiteRepository siteRepository;
+    private final FindLemmas findLemmas;
 
     public static HashSet<String> pageSet = new LinkedHashSet<>();
     private Pattern pattern = Pattern.compile("(https?://)?([\\w-]+\\.[\\w-]+)[^\\s@]*$");
 
-    private AtomicBoolean stop;
-
-
-    public EntitiesServiceImpl(IndexRepository indexRepository, LemmaRepository lemmaRepository,
-                               PageRepository pageRepository, SiteRepository siteRepository) {
-        this.indexRepository = indexRepository;
-        this.lemmaRepository = lemmaRepository;
-        this.pageRepository = pageRepository;
-        this.siteRepository = siteRepository;
-        stop = IndexingServiceImpl.getStop();
-    }
 
     @Override
-    public Site addSite(searchengine.config.Site siteCfg, StatusEnum statusEnum) {
-        Site site = new Site();
+    public Site updtaeOrAddSite(searchengine.config.Site siteCfg, StatusEnum statusEnum) {
+        Site site;
+        Optional<Site> siteOptional  = siteRepository.findByName(siteCfg.getName());
+        if (siteOptional.isPresent()) {
+            site = siteOptional.get();
+            site.setStatus(statusEnum);
+            site.setStatusTime(new Date());
+            siteRepository.save(site);
+            return site;
+        }
+        site = new Site();
         site.setName(siteCfg.getName());
         site.setUrl(siteCfg.getUrl().replaceAll("(www.)?", ""));
-        site.setStatus(statusEnum);
         site.setLastError("");
+        site.setStatus(statusEnum);
         site.setStatusTime(new Date());
         siteRepository.save(site);
         return site;
@@ -70,11 +71,10 @@ public class EntitiesServiceImpl implements EntitiesService {
     public void addLemmaAndIndex(Page page, HashMap<String, Integer> lemmas) {
         synchronized (lemmaRepository) {
             for (String s : lemmas.keySet()) {
-                if (stop.get() == true) break;
                 Index index = new Index();
                 index.setPageId(page);
                 Optional<Lemma> lemmaFromSql = lemmaRepository.findByLemmaAndSiteId(s, page.getSiteId());
-//                Проверить логику работы поиска леммы лист или оптионал
+//                Проверить логику работы поиска леммы лист или опшнл
                 if (!lemmaFromSql.isPresent()) {
                     Lemma lemma = new Lemma();
                     lemma.setLemma(s);
@@ -138,12 +138,19 @@ public class EntitiesServiceImpl implements EntitiesService {
         }
     }
 
+    public synchronized void findLemmasInPageText(Page page) {
+        Document document = Jsoup.parse(page.getContent());
+        String text = document.title() + " " + document.body().text();
+        HashMap<String, Integer> lemmaList = findLemmas.getLemmasInMap(text);
+        addLemmaAndIndex(page, lemmaList);
+    }
+
     @Override
     public Connection.Response getConnection(String url) {
-        Connection.Response connection = null;
+        Connection.Response connection;
         synchronized (pageRepository) {
             try {
-                Thread.sleep(1000);
+                Thread.sleep(600);
                 connection = Jsoup.connect(url)
                         .ignoreHttpErrors(true)
                         .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" +

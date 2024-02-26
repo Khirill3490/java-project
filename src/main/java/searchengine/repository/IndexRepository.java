@@ -21,7 +21,4 @@ public interface IndexRepository extends JpaRepository<Index, Integer> {
     List<Index> findByLemmaId(Lemma lemma);
 
     Optional<Index> findByPageIdAndLemmaId(Page page, Lemma lemma);
-
-
-    List<Index> findByPageId(Page page);
 }

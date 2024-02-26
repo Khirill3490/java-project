@@ -18,7 +18,6 @@ import java.util.*;
 
 @Component
 public class FindLemmas {
-    private LuceneMorphology luceneMorphology;
     private static RussianLuceneMorphology russianMorph;
 
 

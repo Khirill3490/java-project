@@ -8,7 +8,7 @@ import searchengine.models.StatusEnum;
 import java.util.HashMap;
 
 public interface EntitiesService {
-    Site addSite(searchengine.config.Site siteCfg, StatusEnum statusEnum);
+    Site updtaeOrAddSite(searchengine.config.Site siteCfg, StatusEnum statusEnum);
 
     Page addPage(Site site, String pageUrl, String content, int i);
 
@@ -17,6 +17,8 @@ public interface EntitiesService {
     boolean isLink(String link);
 
     void parseLink(Site site, String pageUrl);
+
+    void findLemmasInPageText(Page page);
 
     Connection.Response getConnection(String url);
 }
