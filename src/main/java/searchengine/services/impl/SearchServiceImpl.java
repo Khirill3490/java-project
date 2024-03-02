@@ -28,83 +28,58 @@ public class SearchServiceImpl implements SearchService {
     private final IndexRepository indexRepository;
     private final FindLemmas findLemmas;
     private int lemmaCount;
-    private List<Page> pageList = new ArrayList<>();
 
     @Override
     public Object startSearch(String query, String site, Integer offset, Integer limit) {
         if (offset == null) offset = 0;
         SearchingResponse searchingResponse = new SearchingResponse();
         if (query.isEmpty()) throw new BadRequestException("Задан пустой поисковый запрос");
-        List<String> lemmaList = lemmaListByFrequency(findLemmas.getLemmasFromQuery(query));
-        if(lemmaList.isEmpty()) throw new DataNotFoundException("Леммы, по запросу '" + query + "' не найдены");
-        getSearchPages(lemmaList, site);
-
+        List<String> stringLemmaList = lemmaListByFrequency(findLemmas.getLemmasFromQuery(query), site);
+        if(stringLemmaList.isEmpty()) throw new DataNotFoundException("Леммы, по запросу '" + query + "' не найдены");
+        List<Page> pages = getSearchPages(stringLemmaList);
 
         Relevance relevance = new Relevance(lemmaRepository, indexRepository);
-        Map<Page, Float> map = relevance.getPagesRelevance(pageList, lemmaList);
+        Map<Page, Float> map = relevance.getPagesRelevance(pages, stringLemmaList);
         List<DataSearch> dataSearchList;
 
-        if (limit != 0 && (offset != null || offset != 0)) {
-            dataSearchList = getListByOffset(getSearchLemmas(map, lemmaList), limit, offset);
-        } else {
-            dataSearchList = getSearchLemmas(map, lemmaList);
-        }
+        if (limit > 0 && offset > 0) {
+            dataSearchList = getListByOffset(getSearchLemmas(map, stringLemmaList), limit, offset);
+        } else dataSearchList = getSearchLemmas(map, stringLemmaList);
 
         searchingResponse.setResult(true);
         searchingResponse.setCount(getLemmaCount());
         searchingResponse.setData(dataSearchList);
         setLemmaCount(0);
-        pageList.clear();
 
         return searchingResponse;
     }
 
-    public void getSearchPages(List<String> lemmaList, String site) {
-        for (String lemma: lemmaList) {
-            List<Page> pList = new ArrayList<>(pageList);
-            setLemmaCount(0);
-            if (site == null) {
-                if (getIndexedSites().isEmpty()) throw new DataNotFoundException("Нет проиндексированных сайтов");
-                searchPages(lemma, getIndexedSites(), pList);
-            } else {
-                System.out.println(site);
-                System.out.println("Внтри метода");
-                Optional<Site> siteOptional = siteRepository.findByUrl(site);
-                if (!siteOptional.isPresent()) throw new DataNotFoundException("Такой сайт не найден в БД");
-                if (siteOptional.get().getStatus() != StatusEnum.INDEXED) throw new BadRequestException("Данный сайт не проиндексирован");
-                searchPages(lemma, Collections.singletonList(siteOptional.get()), pList);
-            }
-        }
-    }
-
-    public void searchPages(String query, List<Site> indexedSites, List<Page> pages) {
-        List<Page> pList = new ArrayList<>();
-        for (Site site : indexedSites) {
-            Optional<Lemma> lemmaOptional = lemmaRepository.findByLemmaAndSiteId(query, site);
-            if (lemmaOptional.isPresent()) {
-                Lemma lemma = lemmaOptional.get();
+    public List<Page> getSearchPages(List<String> list) {
+        List<Page> pages = new ArrayList<>();
+        for (String s: list) {
+            List<Lemma> lemmaList = lemmaRepository.findByLemma(s);
+            for (Lemma lemma: lemmaList) {
                 List<Index> indexList = indexRepository.findByLemmaId(lemma);
-                for (Index index : indexList) {
-                    Page page = index.getPageId();
-                    if (pages.isEmpty()) pageList.add(page);
-                    else pList.add(page);
+                for (Index index: indexList) {
+                    pages.add(index.getPageId());
                 }
             }
         }
-        if (!pages.isEmpty()) pageList.retainAll(pList);
+        return pages;
     }
 
     public List<DataSearch> getSearchLemmas(Map<Page, Float> pageList, List<String> lemmaList) {
         List<DataSearch> dsList = new ArrayList<>();
-        for (Page p: pageList.keySet()) {
+        for (Page page: pageList.keySet()) {
             for (String s: lemmaList) {
-                dsList.addAll(search(s, p.getSiteId(), p, pageList.get(p)));
+                dsList.addAll(search(s, page, pageList.get(page)));
             }
         }
         return dsList;
     }
 
-    public List<DataSearch> search(String query, Site site, Page page, float relevance) {
+    public List<DataSearch> search(String query, Page page, float relevance) {
+        Site site = page.getSiteId();
         List<DataSearch> dataSearchList = new ArrayList<>();
         Lemma lemma = lemmaRepository.findByLemmaAndSiteId(query, site).get();
         Index index = indexRepository.findByPageIdAndLemmaId(page, lemma).get();
@@ -120,11 +95,17 @@ public class SearchServiceImpl implements SearchService {
         return dataSearchList;
     }
 
-    public List<String> lemmaListByFrequency(Set<String> setList) {
+    public List<String> lemmaListByFrequency(Set<String> setList, String siteUrl) {
         HashMap<String, Integer> map = new HashMap<>();
+        List<String> lemmalist = new ArrayList<>();
         for (String s: setList) {
-            List<Lemma> listListFromSql = lemmaRepository.findByLemma(s);
-            for (Lemma lemma: listListFromSql) {
+            List<Lemma> lemmaList;
+            if (siteRepository.findByUrl(siteUrl).isPresent()) {
+                Site site = siteRepository.findByUrl(siteUrl).get();
+                lemmaList = lemmaRepository.findLemmaByLemmaAndSiteId(s, site);
+            } else lemmaList = lemmaRepository.findByLemma(s);
+            
+            for (Lemma lemma: lemmaList) {
                 if (map.containsKey(lemma.getLemma())) {
                     map.put(lemma.getLemma(),
                             map.get(lemma.getLemma()) + lemma.getFrequency());
@@ -132,16 +113,12 @@ public class SearchServiceImpl implements SearchService {
             }
         }
         map.values().removeIf(value -> value > 30);
-        List<String> resultList = new ArrayList<>(map.keySet());
-        resultList.sort(Comparator.comparingInt(map::get));
-        return resultList;
-    }
-
-    public List<Site> getIndexedSites() {
-        return siteRepository.findAll()
-                .stream()
-                .filter(site ->  site.getStatus().equals(StatusEnum.INDEXED))
-                .collect(Collectors.toList());
+        List<Map.Entry<String, Integer>> list = new ArrayList<>(map.entrySet());
+        list.sort(Comparator.comparing(Map.Entry::getValue));
+        for (Map.Entry<String, Integer> entry : list) {
+            lemmalist.add(entry.getKey());
+        }
+        return lemmalist;
     }
 
     public String getTitle(Page page) {
@@ -150,7 +127,9 @@ public class SearchServiceImpl implements SearchService {
     }
 
     public List<DataSearch> getListByOffset(List<DataSearch> dsList, int limit, int offset) {
-        return dsList.subList(limit * (offset - 1), dsList.size());
+        int result = limit * (offset - 1);
+        if (result > dsList.size()) throw new BadRequestException("Значение offset некорректное: " + offset);
+        return dsList.subList(result, dsList.size());
     }
     public int getLemmaCount() { return lemmaCount; }
 

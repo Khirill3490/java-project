@@ -1,18 +1,10 @@
 package searchengine.util;
 
-import org.apache.lucene.morphology.LuceneMorphology;
 import org.apache.lucene.morphology.russian.RussianLuceneMorphology;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
-import searchengine.models.Index;
-import searchengine.models.Lemma;
 import searchengine.models.Page;
-import searchengine.models.Site;
-import searchengine.repository.IndexRepository;
-import searchengine.repository.LemmaRepository;
-
 import java.io.IOException;
 import java.util.*;
 
@@ -123,6 +115,7 @@ public class FindLemmas {
     }
 
     public Set<String> getLemmasFromQuery(String query) {
+        System.out.println(query + "--------------");
         Set<String> lemmaList = new HashSet<>();
         FindLemmas findLemmas = new FindLemmas();
         String[] words = query.trim().toLowerCase().split("\\s+");

@@ -17,7 +17,6 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
-@Component
 public class Relevance {
 
     private final LemmaRepository lemmaRepository;
@@ -34,18 +33,13 @@ public class Relevance {
             for (String s : lemmaList) {
                 Lemma lemma = lemmaRepository.findByLemmaAndSiteId(s, p.getSiteId()).get();
                 Index index = indexRepository.findByPageIdAndLemmaId(p, lemma).get();
+//                System.out.println(s);
                 a = a + index.getRank();
-                System.out.println("Для страницы" + p.getPath() + " и слова " + s + " Ранк = " + index.getRank() + " a = " + a);
             }
             if (a > maxRank) maxRank = a;
-            System.out.println(a + "||" + maxRank + "=======================================");
             map.put(p, a);
         }
         map.replaceAll((k, v) -> v / maxRank);
-        for (Float f: map.values()) {
-            System.out.println("===========================Значение ф " + f);
-
-        }
         return map.entrySet().stream()
                 .sorted(Collections.reverseOrder(Map.Entry.comparingByValue()))
                 .collect(Collectors.toMap(
@@ -53,10 +47,5 @@ public class Relevance {
                         Map.Entry::getValue,
                         (a, b) -> a, LinkedHashMap::new));
     }
-
-//    public Map<String, Integer> calculatePagesRelevance(Map<String, Float> map) {
-//        map.replaceAll((k, v) -> v / maxRank);
-//        return map;
-//    }
 
 }

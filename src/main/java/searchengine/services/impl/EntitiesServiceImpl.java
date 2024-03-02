@@ -15,11 +15,9 @@ import searchengine.repository.PageRepository;
 import searchengine.repository.SiteRepository;
 import searchengine.services.EntitiesService;
 import searchengine.util.FindLemmas;
-import searchengine.util.HtmlParserFork;
 
 import java.io.IOException;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
 @Service

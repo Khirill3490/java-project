@@ -34,11 +34,4 @@ public class Index {
     @Column(columnDefinition = "Decimal", nullable = false, name = "ranks")
     private Float rank;
 
-//    index — поисковый индекс
-//● id INT NOT NULL AUTO_INCREMENT;
-//● page_id INT NOT NULL — идентификатор страницы;
-//● lemma_id INT NOT NULL — идентификатор леммы;
-//● rank FLOAT NOT NULL — количество данной леммы для данной
-//    страницы.
-
 }

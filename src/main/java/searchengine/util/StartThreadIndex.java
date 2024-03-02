@@ -5,13 +5,12 @@ import searchengine.models.Site;
 import searchengine.models.StatusEnum;
 import searchengine.repository.SiteRepository;
 import searchengine.services.EntitiesService;
-import searchengine.services.impl.IndexingServiceImpl;
-
 import java.util.Date;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Optional;
 import java.util.concurrent.ForkJoinPool;
+
 @RequiredArgsConstructor
 public class StartThreadIndex implements Runnable {
 
@@ -27,11 +26,10 @@ public class StartThreadIndex implements Runnable {
         Site site = getSiteModel(siteCfg, StatusEnum.INDEXING, "");
         HtmlParserFork htmlParserFork = new HtmlParserFork(entitiesService, site, site.getUrl());
         pool.invoke(htmlParserFork);
-        htmlParserFork.join();
+        pool.shutdown();
         resultPagesSet.clear();
         if (HtmlParserFork.stop.get() == false) getSiteModel(siteCfg, StatusEnum.INDEXED, "");
         else getSiteModel(siteCfg, StatusEnum.FAILED, "Индексация остановлена пользователем");
-
     }
 
     public Site getSiteModel(searchengine.config.Site siteConfig, StatusEnum statusEnum, String errMessage) {

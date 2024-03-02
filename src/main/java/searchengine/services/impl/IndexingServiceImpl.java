@@ -31,7 +31,6 @@ public class IndexingServiceImpl implements IndexingService {
     private final EntitiesService entitiesService;
     private Pattern pattern = Pattern.compile("(https?://)?([\\w-]+\\.[\\w-]+)[^\\s@]*$");
     private IndexingResponse indexingResponse;
-    private ExecutorService executorService = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
 
     public IndexingResponse startIndexing() {
         if (isActiveIndexing()) {
@@ -69,7 +68,7 @@ public class IndexingServiceImpl implements IndexingService {
                 pageRepository.delete(pageOptional.get());
                 Page page = entitiesService.addPage(site, url, content, connection.statusCode());
                 entitiesService.findLemmasInPageText(page);
-                return new IndexingResponse(true);
+                return new IndexingResponse(true, "Страница проиндексирована");
             }
             else {
                 for (searchengine.config.Site siteCfg : sitesList.getSites()) {
@@ -77,7 +76,7 @@ public class IndexingServiceImpl implements IndexingService {
                         site = entitiesService.updtaeOrAddSite(siteCfg, StatusEnum.INDEXED);
                         Page page = entitiesService.addPage(site, url, content, connection.statusCode());
                         entitiesService.findLemmasInPageText(page);
-                        return new IndexingResponse(true);
+                        return new IndexingResponse(true, "Страница проиндексирована");
                     }
                 }
             }
@@ -96,11 +95,15 @@ public class IndexingServiceImpl implements IndexingService {
     }
 
     public void indexing() {
-        for (searchengine.config.Site siteCfg: sitesList.getSites()) {
-            executorService.execute(new StartThreadIndex(entitiesService, siteRepository, siteCfg));
-        }
-        executorService.shutdown();
-        System.out.println("Завершено");
+        HtmlParserFork.stop.set(false);
+        Thread thread = new Thread(() -> {
+            ExecutorService executorService = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+            for (searchengine.config.Site siteCfg : sitesList.getSites()) {
+                executorService.execute(new StartThreadIndex(entitiesService, siteRepository, siteCfg));
+            }
+            executorService.shutdown();
+        });
+        thread.start();
     }
 
     public boolean isLink(String url) {
