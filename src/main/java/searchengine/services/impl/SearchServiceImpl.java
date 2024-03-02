@@ -31,7 +31,8 @@ public class SearchServiceImpl implements SearchService {
 
     @Override
     public Object startSearch(String query, String site, Integer offset, Integer limit) {
-        if (offset == null) offset = 0;
+        if (limit < 1) throw new BadRequestException("limit не может быть меньше 1");
+        System.out.println(limit);
         SearchingResponse searchingResponse = new SearchingResponse();
         if (query.isEmpty()) throw new BadRequestException("Задан пустой поисковый запрос");
         List<String> stringLemmaList = lemmaListByFrequency(findLemmas.getLemmasFromQuery(query), site);
@@ -40,11 +41,7 @@ public class SearchServiceImpl implements SearchService {
 
         Relevance relevance = new Relevance(lemmaRepository, indexRepository);
         Map<Page, Float> map = relevance.getPagesRelevance(pages, stringLemmaList);
-        List<DataSearch> dataSearchList;
-
-        if (limit > 0 && offset > 0) {
-            dataSearchList = getListByOffset(getSearchLemmas(map, stringLemmaList), limit, offset);
-        } else dataSearchList = getSearchLemmas(map, stringLemmaList);
+        List<DataSearch> dataSearchList = getListByOffset(getSearchLemmas(map, stringLemmaList), limit, offset);
 
         searchingResponse.setResult(true);
         searchingResponse.setCount(getLemmaCount());
@@ -104,7 +101,7 @@ public class SearchServiceImpl implements SearchService {
                 Site site = siteRepository.findByUrl(siteUrl).get();
                 lemmaList = lemmaRepository.findLemmaByLemmaAndSiteId(s, site);
             } else lemmaList = lemmaRepository.findByLemma(s);
-            
+
             for (Lemma lemma: lemmaList) {
                 if (map.containsKey(lemma.getLemma())) {
                     map.put(lemma.getLemma(),
@@ -127,9 +124,10 @@ public class SearchServiceImpl implements SearchService {
     }
 
     public List<DataSearch> getListByOffset(List<DataSearch> dsList, int limit, int offset) {
-        int result = limit * (offset - 1);
-        if (result > dsList.size()) throw new BadRequestException("Значение offset некорректное: " + offset);
-        return dsList.subList(result, dsList.size());
+        int result = 0;
+        if (offset > 1) result = limit * (offset - 1);
+        return dsList.subList(result >= dsList.size() ? 0 : result,
+                (result + limit) > dsList.size() ? dsList.size() : result + limit);
     }
     public int getLemmaCount() { return lemmaCount; }
 

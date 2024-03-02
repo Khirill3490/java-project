@@ -115,7 +115,6 @@ public class FindLemmas {
     }
 
     public Set<String> getLemmasFromQuery(String query) {
-        System.out.println(query + "--------------");
         Set<String> lemmaList = new HashSet<>();
         FindLemmas findLemmas = new FindLemmas();
         String[] words = query.trim().toLowerCase().split("\\s+");
