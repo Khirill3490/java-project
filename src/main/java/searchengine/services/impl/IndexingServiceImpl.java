@@ -1,6 +1,7 @@
 package searchengine.services.impl;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Connection;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -24,12 +25,14 @@ import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class IndexingServiceImpl implements IndexingService {
     private final PageRepository pageRepository;
     private final SiteRepository siteRepository;
     private final SitesList sitesList;
     private final EntitiesService entitiesService;
-    private Pattern pattern = Pattern.compile("(https?://)?([\\w-]+\\.[\\w-]+)[^\\s@]*$");
+    private final searchengine.util.Connection connection;
+    private final Pattern pattern = Pattern.compile("(https?://)?([\\w-]+\\.[\\w-]+)[^\\s@]*$");
     private IndexingResponse indexingResponse;
 
     public IndexingResponse startIndexing() {
@@ -38,6 +41,7 @@ public class IndexingServiceImpl implements IndexingService {
         } else {
             siteRepository.deleteAll();
             indexingResponse = new IndexingResponse(true);
+            log.info("Запуск индексации пользователем");
             indexing();
         }
         return indexingResponse;
@@ -47,49 +51,60 @@ public class IndexingServiceImpl implements IndexingService {
         if (isActiveIndexing()) {
             HtmlParserFork.stop.set(true);
             indexingResponse = new IndexingResponse(true);
-        } else indexingResponse = new IndexingResponse(false, "Индексация не запущена");
+            log.info("Остановка индексации пользователем");
+        } else {
+            indexingResponse = new IndexingResponse(false, "Индексация не запущена");
+        }
         return indexingResponse;
 
     }
     @Override
     public IndexingResponse indexPage(String url) {
         try {
-            if (!isLink(url)) throw new DataNotFoundException("Некорректный URL");
-            Connection.Response connection = entitiesService.getConnection(url);
-            String content = connection.parse().html();
-            if (connection.statusCode() != HttpStatus.OK.value()) {
+            if (!isLink(url)) {
+                throw new DataNotFoundException("Некорректный URL");
+            }
+            Connection.Response connect = connection.getConnection(url);
+            String content = connect.parse().html();
+            if (connect.statusCode() != HttpStatus.OK.value()) {
                 throw new BadRequestException("Контент недоступен. Код ответа страницы "
-                        + connection.statusCode());
+                        + connect.statusCode());
             }
             Site site;
             Optional<Page> pageOptional = pageRepository.findByPath(url);
             if (pageOptional.isPresent()) {
                 site = pageOptional.get().getSiteId();
                 pageRepository.delete(pageOptional.get());
-                Page page = entitiesService.addPage(site, url, content, connection.statusCode());
+                Page page = entitiesService.addPage(site, url, content, connect.statusCode());
                 entitiesService.findLemmasInPageText(page);
+                log.info("Страница " + page.getPath() + " проиндексирована");
                 return new IndexingResponse(true, "Страница проиндексирована");
             }
             else {
                 for (searchengine.config.Site siteCfg : sitesList.getSites()) {
                     if (url.contains(siteCfg.getUrl().replaceAll("(www.)?", ""))) {
-                        site = entitiesService.updtaeOrAddSite(siteCfg, StatusEnum.INDEXED);
-                        Page page = entitiesService.addPage(site, url, content, connection.statusCode());
+                        site = updateOrAddSite(siteCfg, StatusEnum.INDEXED);
+                        Page page = entitiesService.addPage(site, url, content, connect.statusCode());
                         entitiesService.findLemmasInPageText(page);
+                        log.info("Страница " + page.getPath() + " проиндексирована");
                         return new IndexingResponse(true, "Страница проиндексирована");
                     }
                 }
             }
+            log.error("Ссылка " + url + " не проидексирована. За пределами сайта");
             return new IndexingResponse(false, "Страница за пределами проиндексированных сайтов");
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            log.error(e.getMessage());
+            throw new RuntimeException(e.getMessage());
         }
     }
 
     private boolean isActiveIndexing() {
         List<Site> siteList = siteRepository.findAll();
         for (Site site : siteList) {
-            if(site.getStatus().name().equals("INDEXING")) return true;
+            if(site.getStatus().name().equals("INDEXING")) {
+                return true;
+            }
         }
         return false;
     }
@@ -99,16 +114,33 @@ public class IndexingServiceImpl implements IndexingService {
         Thread thread = new Thread(() -> {
             ExecutorService executorService = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
             for (searchengine.config.Site siteCfg : sitesList.getSites()) {
-                executorService.execute(new StartThreadIndex(entitiesService, siteRepository, siteCfg));
+                executorService.execute(new StartThreadIndex(entitiesService, siteRepository, connection, siteCfg));
             }
             executorService.shutdown();
         });
         thread.start();
     }
 
+    public Site updateOrAddSite(searchengine.config.Site siteCfg, StatusEnum statusEnum) {
+        Site site;
+        Optional<Site> siteOptional  = siteRepository.findByName(siteCfg.getName());
+        if (siteOptional.isPresent()) {
+            site = siteOptional.get();
+        } else  {
+            site = new Site();
+            site.setName(siteCfg.getName());
+            site.setUrl(siteCfg.getUrl().replaceAll("(www.)?", ""));
+            site.setLastError("");
+        }
+        site.setStatus(statusEnum);
+        site.setStatusTime(new Date());
+        siteRepository.save(site);
+        log.info("Сайт " + site.getUrl() + " добавлен в БД");
+        return site;
+    }
+
     public boolean isLink(String url) {
-        if (!url.isEmpty() || pattern.matcher(url).find()) return true;
-        return false;
+        return !url.isEmpty() || pattern.matcher(url).find();
     }
 
 }

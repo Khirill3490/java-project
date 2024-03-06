@@ -1,11 +1,11 @@
 package searchengine.services.impl;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.springframework.stereotype.Service;
 import searchengine.dto.searching.DataSearch;
-import searchengine.dto.searching.ErrorSearchingResponse;
 import searchengine.dto.searching.SearchingResponse;
 import searchengine.exceptions.BadRequestException;
 import searchengine.exceptions.DataNotFoundException;
@@ -18,10 +18,10 @@ import searchengine.util.FindLemmas;
 import searchengine.util.Relevance;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class SearchServiceImpl implements SearchService {
     private final SiteRepository siteRepository;
     private final LemmaRepository lemmaRepository;
@@ -30,13 +30,18 @@ public class SearchServiceImpl implements SearchService {
     private int lemmaCount;
 
     @Override
-    public Object startSearch(String query, String site, Integer offset, Integer limit) {
-        if (limit < 1) throw new BadRequestException("limit не может быть меньше 1");
-        System.out.println(limit);
+    public SearchingResponse startSearch(String query, String site, Integer offset, Integer limit) {
+        if (limit < 1)  {
+            throw new BadRequestException("limit не может быть меньше 1");
+        } if (query.isEmpty()) {
+            throw new BadRequestException("Задан пустой поисковый запрос");
+        }
         SearchingResponse searchingResponse = new SearchingResponse();
-        if (query.isEmpty()) throw new BadRequestException("Задан пустой поисковый запрос");
         List<String> stringLemmaList = lemmaListByFrequency(findLemmas.getLemmasFromQuery(query), site);
-        if(stringLemmaList.isEmpty()) throw new DataNotFoundException("Леммы, по запросу '" + query + "' не найдены");
+        if(stringLemmaList.isEmpty()) {
+            throw new DataNotFoundException("Леммы, по запросу '" + query + "' не найдены");
+        }
+        log.info("Леммы, по запросу '" + query + "'  найдены");
         List<Page> pages = getSearchPages(stringLemmaList);
 
         Relevance relevance = new Relevance(lemmaRepository, indexRepository);
@@ -78,8 +83,10 @@ public class SearchServiceImpl implements SearchService {
     public List<DataSearch> search(String query, Page page, float relevance) {
         Site site = page.getSiteId();
         List<DataSearch> dataSearchList = new ArrayList<>();
-        Lemma lemma = lemmaRepository.findByLemmaAndSiteId(query, site).get();
-        Index index = indexRepository.findByPageIdAndLemmaId(page, lemma).get();
+        Lemma lemma = lemmaRepository.findByLemmaAndSiteId(query, site).orElseThrow(() -> new
+                DataNotFoundException("Лемма не найдена"));
+        Index index = indexRepository.findByPageIdAndLemmaId(page, lemma).orElseThrow(() -> new
+                DataNotFoundException("Индекс не найден"));
         setLemmaCount((int) (getLemmaCount() + index.getRank()));
         String uri = page.getPath().replaceAll(site.getUrl(), "");
         List<String> text = findLemmas.getTextFromPage(query, page);
@@ -111,7 +118,7 @@ public class SearchServiceImpl implements SearchService {
         }
         map.values().removeIf(value -> value > 30);
         List<Map.Entry<String, Integer>> list = new ArrayList<>(map.entrySet());
-        list.sort(Comparator.comparing(Map.Entry::getValue));
+        list.sort(Map.Entry.comparingByValue());
         for (Map.Entry<String, Integer> entry : list) {
             lemmalist.add(entry.getKey());
         }
@@ -127,7 +134,7 @@ public class SearchServiceImpl implements SearchService {
         int result = 0;
         if (offset > 1) result = limit * (offset - 1);
         return dsList.subList(result >= dsList.size() ? 0 : result,
-                (result + limit) > dsList.size() ? dsList.size() : result + limit);
+                Math.min((result + limit), dsList.size()));
     }
     public int getLemmaCount() { return lemmaCount; }
 

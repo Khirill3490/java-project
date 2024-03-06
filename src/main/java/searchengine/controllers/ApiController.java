@@ -4,6 +4,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import searchengine.dto.indexing.IndexingResponse;
+import searchengine.dto.searching.SearchingResponse;
 import searchengine.dto.statistics.StatisticsResponse;
 import searchengine.services.IndexingService;
 import searchengine.services.SearchService;
@@ -47,7 +48,7 @@ public class ApiController {
     }
 
     @GetMapping("/search")
-    public ResponseEntity<?> search(@RequestParam(value = "query", required = false) String query,
+    public ResponseEntity<SearchingResponse> search(@RequestParam(value = "query", required = false) String query,
                                                     @RequestParam(value = "site", required = false) String site,
                                                     @RequestParam(value = "offset", required = false) Integer offset,
                                                     @RequestParam(value = "limit", required = false) Integer limit) {

@@ -1,10 +1,8 @@
 package searchengine.dto.searching;
 
-import lombok.AllArgsConstructor;
 import lombok.Data;
 
 @Data
-
 public class ErrorSearchingResponse {
 
     private boolean result;

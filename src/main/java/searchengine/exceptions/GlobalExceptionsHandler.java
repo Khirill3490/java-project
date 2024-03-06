@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 public class GlobalExceptionsHandler {
 
     @ExceptionHandler
-    public ResponseEntity<ErrorIndexingResponse> NotFoundException (DataNotFoundException e) {
+    public ResponseEntity<ErrorIndexingResponse> notFoundException(DataNotFoundException e) {
         ErrorIndexingResponse response = new ErrorIndexingResponse();
         response.setResult(false);
         response.setError(e.getMessage());
@@ -18,7 +18,7 @@ public class GlobalExceptionsHandler {
     }
 
     @ExceptionHandler
-    private ResponseEntity<ErrorIndexingResponse> NotFoundException (BadRequestException e) {
+    private ResponseEntity<ErrorIndexingResponse> notFoundException(BadRequestException e) {
         ErrorIndexingResponse response = new ErrorIndexingResponse();
         response.setResult(false);
         response.setError(e.getMessage());
@@ -27,7 +27,7 @@ public class GlobalExceptionsHandler {
     }
 
     @ExceptionHandler
-    private ResponseEntity<ErrorIndexingResponse> NotFoundException (Exception e) {
+    private ResponseEntity<ErrorIndexingResponse> notFoundException(Exception e) {
         ErrorIndexingResponse response = new ErrorIndexingResponse();
         response.setResult(false);
         response.setError(e.getMessage());

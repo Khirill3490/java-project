@@ -16,7 +16,9 @@ public class StartThreadIndex implements Runnable {
 
     private final EntitiesService entitiesService;
     private final SiteRepository siteRepository;
+    private final Connection connection;
     private final searchengine.config.Site siteCfg;
+
 
     public static HashSet<String> resultPagesSet = new LinkedHashSet<>();
 
@@ -24,18 +26,22 @@ public class StartThreadIndex implements Runnable {
     public void run() {
         ForkJoinPool pool = new ForkJoinPool();
         Site site = getSiteModel(siteCfg, StatusEnum.INDEXING, "");
-        HtmlParserFork htmlParserFork = new HtmlParserFork(entitiesService, site, site.getUrl());
+        HtmlParserFork htmlParserFork = new HtmlParserFork(entitiesService, connection, site, site.getUrl());
         pool.invoke(htmlParserFork);
         pool.shutdown();
         resultPagesSet.clear();
-        if (HtmlParserFork.stop.get() == false) getSiteModel(siteCfg, StatusEnum.INDEXED, "");
-        else getSiteModel(siteCfg, StatusEnum.FAILED, "Индексация остановлена пользователем");
+        if (!HtmlParserFork.stop.get()) {
+            getSiteModel(siteCfg, StatusEnum.INDEXED, "");
+        }
+        else {
+            getSiteModel(siteCfg, StatusEnum.FAILED, "Индексация остановлена пользователем");
+        }
     }
 
     public Site getSiteModel(searchengine.config.Site siteConfig, StatusEnum statusEnum, String errMessage) {
         Optional<Site> siteOptional = siteRepository.findByName(siteConfig.getName());
         Site site = new Site();
-        if (!siteOptional.isPresent()) {
+        if (siteOptional.isEmpty()) {
             site.setName(siteConfig.getName());
             site.setUrl(siteConfig.getUrl().replaceAll("(www.)?", ""));
             site.setStatus(statusEnum);

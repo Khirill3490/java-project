@@ -1,12 +1,9 @@
 package searchengine.util;
 
-import lombok.Data;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
-import org.springframework.stereotype.Component;
-import org.springframework.stereotype.Service;
-import searchengine.dto.searching.DataSearch;
+import searchengine.exceptions.DataNotFoundException;
 import searchengine.models.Index;
 import searchengine.models.Lemma;
 import searchengine.models.Page;
@@ -31,16 +28,18 @@ public class Relevance {
         for (Page p: pageList) {
             float a = 0.00f;
             for (String s : lemmaList) {
-                Lemma lemma = lemmaRepository.findByLemmaAndSiteId(s, p.getSiteId()).get();
-                Index index = indexRepository.findByPageIdAndLemmaId(p, lemma).get();
-//                System.out.println(s);
+                Lemma lemma = lemmaRepository.findByLemmaAndSiteId(s, p.getSiteId()).orElseThrow(() -> new
+                        DataNotFoundException("Лемма не найдена"));
+                Index index = indexRepository.findByPageIdAndLemmaId(p, lemma).orElseThrow(() -> new
+                        DataNotFoundException("Индекс не найден"));
                 a = a + index.getRank();
             }
             if (a > maxRank) maxRank = a;
             map.put(p, a);
         }
         map.replaceAll((k, v) -> v / maxRank);
-        return map.entrySet().stream()
+        return map.entrySet()
+                .stream()
                 .sorted(Collections.reverseOrder(Map.Entry.comparingByValue()))
                 .collect(Collectors.toMap(
                         Map.Entry::getKey,

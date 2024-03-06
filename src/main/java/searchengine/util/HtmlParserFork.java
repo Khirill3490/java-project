@@ -1,7 +1,8 @@
 package searchengine.util;
 
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Connection;
-import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.select.Elements;
 import org.springframework.http.HttpStatus;
@@ -10,36 +11,35 @@ import searchengine.models.Site;
 import searchengine.services.EntitiesService;
 
 import java.io.IOException;
-import java.net.SocketTimeoutException;
 import java.util.*;
 import java.util.concurrent.RecursiveAction;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.regex.Pattern;
 
+@Slf4j
+@RequiredArgsConstructor
 public class HtmlParserFork extends RecursiveAction {
     private final EntitiesService entitiesService;
-    private Site site;
-    private String link;
+    private final searchengine.util.Connection connection;
+    private final Site site;
+    private final String link;
 
-//    public static HashSet<String> resultPagesSet = new LinkedHashSet<>();
+
+    private final Pattern pattern = Pattern.compile("(https?://)?([\\w-]+\\.[\\w-]+)[^\\s@]*$");
+
     public static AtomicBoolean stop = new AtomicBoolean(false);
-    private FindLemmas findLemmas;
 
-    public HtmlParserFork(EntitiesService entitiesService, Site site, String link) {
-        this.entitiesService = entitiesService;
-        this.site = site;
-        this.link = link;
-    }
 
     @Override
     protected void compute() {
         try {
             List<HtmlParserFork> tasks = new ArrayList<>();
-            if (stop.get() == false) {
-                if (entitiesService.isLink(link)) {
+            if (!stop.get()) {
+                if (isLink(link)) {
                     List<String> linksList = parseLinks(link);
                     if (!linksList.isEmpty()) {
                         for (String link : linksList) {
-                            HtmlParserFork task = new HtmlParserFork(entitiesService, site, link);
+                            HtmlParserFork task = new HtmlParserFork(entitiesService, connection, site, link);
                             task.fork();
                             tasks.add(task);
                         }
@@ -47,27 +47,26 @@ public class HtmlParserFork extends RecursiveAction {
                     joinTasks(tasks);
                 }
             } else joinTasks(tasks);
-        } catch (SocketTimeoutException ex) {
-            System.out.println(ex + link);
-        } catch (InterruptedException e) {
-            System.out.println(e + link);
         } catch (Exception ex) {
+            log.error(ex.getMessage());
             ex.printStackTrace();
         }
     }
 
-    public List<String> parseLinks(String URL) throws IOException, InterruptedException {
+    public List<String> parseLinks(String URL) throws IOException {
         List<String> links = new ArrayList<>();
-        Connection.Response connection = entitiesService.getConnection(URL);
-        Document document = connection.parse();
-        if (checkPage(URL, document.html(), connection.statusCode())) return Collections.emptyList();
+        Connection.Response connect = connection.getConnection(URL);
+        Document document = connect.parse();
+        if (checkPage(URL, document.html(), connect.statusCode())) {
+            return Collections.emptyList();
+        }
         Elements elements = document.select("a");
         elements.forEach(element -> {
             String link = element.attr("href").replaceAll("/$", "");
             String linkWithStartUrl = link.startsWith("/") ? URL + link : link;
-            if (!linkWithStartUrl.equals(site.getUrl()) && !StartThreadIndex.resultPagesSet.contains(linkWithStartUrl)
+            if (!linkWithStartUrl.equals(site.getUrl())
+                    && !StartThreadIndex.resultPagesSet.contains(linkWithStartUrl)
                     && (link.startsWith(site.getUrl()) || link.startsWith("/"))) {
-                System.out.println("На странице " + URL + " обнаружена ссылка " + link);
                 links.add(linkWithStartUrl);
             }
         });
@@ -75,8 +74,12 @@ public class HtmlParserFork extends RecursiveAction {
     }
 
     public boolean checkPage(String path, String content, int statusCode) {
-        if (StartThreadIndex.resultPagesSet.contains(path)) return true;
-        if (site.getUrl().equals(path)) return false;
+        if (StartThreadIndex.resultPagesSet.contains(path)) {
+            return true;
+        }
+        if (site.getUrl().equals(path)) {
+            return false;
+        }
         if (statusCode != HttpStatus.OK.value()) {
             StartThreadIndex.resultPagesSet.add(path);
             entitiesService.addPage(site, path, content, statusCode);
@@ -84,8 +87,18 @@ public class HtmlParserFork extends RecursiveAction {
         }
         StartThreadIndex.resultPagesSet.add(path);
         Page page = entitiesService.addPage(site, path, content, statusCode);
-        if (stop.get() == false) entitiesService.findLemmasInPageText(page);
+        if (!stop.get()) {
+            entitiesService.findLemmasInPageText(page);
+        }
         return false;
+    }
+
+    public boolean isLink(String link) {
+
+        return !link.contains(".pdf") && !link.contains(".jpg")
+                && !link.contains("%") && !link.contains("#")
+                && !link.contains(".png") && !link.isEmpty()
+                && pattern.matcher(link).find() && !link.contains("mailto:");
     }
 
     public void joinTasks(List<HtmlParserFork> list) {

@@ -1,8 +1,6 @@
 package searchengine.models;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 
@@ -32,6 +30,8 @@ public class Page {
 
     @Column(columnDefinition = "MEDIUMTEXT", nullable = false)
     private String content;
+
+
 
 
 }

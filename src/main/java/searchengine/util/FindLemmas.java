@@ -10,8 +10,7 @@ import java.util.*;
 
 @Component
 public class FindLemmas {
-    private static RussianLuceneMorphology russianMorph;
-
+    private final static RussianLuceneMorphology russianMorph;
 
     public FindLemmas() {
     }
@@ -32,7 +31,9 @@ public class FindLemmas {
         HashMap<String, Integer> lemmas = new HashMap<>();
 
         for (String word : words) {
-            if (isWord(word) == false) continue;
+            if (!isWord(word)) {
+                continue;
+            }
             List<String> normalForms = russianMorph.getNormalForms(word);
             String normalWordForm = normalForms.get(0);
             if (lemmas.containsKey(normalWordForm)) {
@@ -55,9 +56,12 @@ public class FindLemmas {
 
     private boolean isWord(String word) {
         List<String> list = russianMorph.getMorphInfo(word);
-        if (list.get(0).contains("МЕЖД") || list.get(0).contains("ПРЕДЛ") || list.get(0).contains("СОЮЗ")
-                || list.get(0).contains("ЧАСТ") || list.get(0).contains("МС") || list.get(0).length() < 4) return false;
-        return true;
+        return !list.get(0).contains("МЕЖД")
+                && !list.get(0).contains("ПРЕДЛ")
+                && !list.get(0).contains("СОЮЗ")
+                && !list.get(0).contains("ЧАСТ")
+                && !list.get(0).contains("МС")
+                && list.get(0).length() >= 4;
     }
 
     public List<String> getTextFromPage(String query, Page page) {
@@ -89,8 +93,7 @@ public class FindLemmas {
 
     private List<String> getWordsFromContent(String content, List<Integer> lemmaIndex) {
         List<String> result = new ArrayList<>();
-        for (int i = 0; i < lemmaIndex.size(); i++) {
-            int start = lemmaIndex.get(i);
+        for (int start : lemmaIndex) {
             int end = content.indexOf(" ", start);
             String text = getWordsFromIndex(start, end, content);
             result.add(text);
@@ -103,12 +106,16 @@ public class FindLemmas {
         String word = content.substring(start, end).replaceAll("[^А-я]", "");
         int firstPoint;
         int lastPoint;
-        if (content.lastIndexOf(" ", start - 10) != -1) {
-            firstPoint = content.lastIndexOf(" ", start - 10);
-        } else firstPoint = start;
-        if (content.indexOf(" ", end + 10) != -1) {
-            lastPoint = content.indexOf(" ", end + 10);
-        } else lastPoint = content.indexOf(" ", end);
+        if (content.lastIndexOf(" ", start - 90) != -1) {
+            firstPoint = content.lastIndexOf(" ", start - 90);
+        } else {
+            firstPoint = start;
+        }
+        if (content.indexOf(" ", end + 90) != -1) {
+            lastPoint = content.indexOf(" ", end + 90);
+        } else {
+            lastPoint = content.indexOf(" ", end);
+        }
         String words = content.substring(firstPoint, lastPoint);
         String text = words.replaceAll(word, "<b>" + word + "</b>");
         return "..." + text + "...";
@@ -120,10 +127,10 @@ public class FindLemmas {
         String[] words = query.trim().toLowerCase().split("\\s+");
         for (String s: words) {
             List<String> lemmas = findLemmas.getLemmasInArray(s);
-            if (lemmas.isEmpty()) continue;
-            for (String lemma: lemmas) {
-                lemmaList.add(lemma);
+            if (lemmas.isEmpty()) {
+                continue;
             }
+            lemmaList.addAll(lemmas);
         }
         return lemmaList;
     }

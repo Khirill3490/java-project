@@ -1,6 +1,5 @@
 package searchengine.dto.searching;
 
-import lombok.AllArgsConstructor;
 import lombok.Data;
 
 import java.util.List;
