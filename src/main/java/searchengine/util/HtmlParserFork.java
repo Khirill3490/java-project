@@ -8,7 +8,6 @@ import org.jsoup.select.Elements;
 import org.springframework.http.HttpStatus;
 import searchengine.models.Page;
 import searchengine.models.Site;
-import searchengine.services.EntitiesService;
 
 import java.io.IOException;
 import java.util.*;
@@ -19,7 +18,7 @@ import java.util.regex.Pattern;
 @Slf4j
 @RequiredArgsConstructor
 public class HtmlParserFork extends RecursiveAction {
-    private final EntitiesService entitiesService;
+    private final PageUtil pageUtil;
     private final searchengine.util.Connection connection;
     private final Site site;
     private final String link;
@@ -39,7 +38,7 @@ public class HtmlParserFork extends RecursiveAction {
                     List<String> linksList = parseLinks(link);
                     if (!linksList.isEmpty()) {
                         for (String link : linksList) {
-                            HtmlParserFork task = new HtmlParserFork(entitiesService, connection, site, link);
+                            HtmlParserFork task = new HtmlParserFork(pageUtil, connection, site, link);
                             task.fork();
                             tasks.add(task);
                         }
@@ -53,17 +52,17 @@ public class HtmlParserFork extends RecursiveAction {
         }
     }
 
-    public List<String> parseLinks(String URL) throws IOException {
+    public List<String> parseLinks(String url) throws IOException {
         List<String> links = new ArrayList<>();
-        Connection.Response connect = connection.getConnection(URL);
+        Connection.Response connect = connection.getConnection(url);
         Document document = connect.parse();
-        if (checkPage(URL, document.html(), connect.statusCode())) {
+        if (checkPage(url, document.html(), connect.statusCode())) {
             return Collections.emptyList();
         }
         Elements elements = document.select("a");
         elements.forEach(element -> {
             String link = element.attr("href").replaceAll("/$", "");
-            String linkWithStartUrl = link.startsWith("/") ? URL + link : link;
+            String linkWithStartUrl = link.startsWith("/") ? url + link : link;
             if (!linkWithStartUrl.equals(site.getUrl())
                     && !StartThreadIndex.resultPagesSet.contains(linkWithStartUrl)
                     && (link.startsWith(site.getUrl()) || link.startsWith("/"))) {
@@ -82,13 +81,13 @@ public class HtmlParserFork extends RecursiveAction {
         }
         if (statusCode != HttpStatus.OK.value()) {
             StartThreadIndex.resultPagesSet.add(path);
-            entitiesService.addPage(site, path, content, statusCode);
+            pageUtil.addPage(site, path, content, statusCode);
             return true;
         }
         StartThreadIndex.resultPagesSet.add(path);
-        Page page = entitiesService.addPage(site, path, content, statusCode);
+        Page page = pageUtil.addPage(site, path, content, statusCode);
         if (!stop.get()) {
-            entitiesService.findLemmasInPageText(page);
+            pageUtil.findLemmasInPageText(page);
         }
         return false;
     }

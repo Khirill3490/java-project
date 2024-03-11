@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 import searchengine.models.Site;
 import searchengine.models.StatusEnum;
 import searchengine.repository.SiteRepository;
-import searchengine.services.EntitiesService;
+
 import java.util.Date;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -14,7 +14,7 @@ import java.util.concurrent.ForkJoinPool;
 @RequiredArgsConstructor
 public class StartThreadIndex implements Runnable {
 
-    private final EntitiesService entitiesService;
+    private final PageUtil pageUtil;
     private final SiteRepository siteRepository;
     private final Connection connection;
     private final searchengine.config.Site siteCfg;
@@ -26,7 +26,7 @@ public class StartThreadIndex implements Runnable {
     public void run() {
         ForkJoinPool pool = new ForkJoinPool();
         Site site = getSiteModel(siteCfg, StatusEnum.INDEXING, "");
-        HtmlParserFork htmlParserFork = new HtmlParserFork(entitiesService, connection, site, site.getUrl());
+        HtmlParserFork htmlParserFork = new HtmlParserFork(pageUtil, connection, site, site.getUrl());
         pool.invoke(htmlParserFork);
         pool.shutdown();
         resultPagesSet.clear();

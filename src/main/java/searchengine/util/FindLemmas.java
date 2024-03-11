@@ -10,10 +10,7 @@ import java.util.*;
 
 @Component
 public class FindLemmas {
-    private final static RussianLuceneMorphology russianMorph;
-
-    public FindLemmas() {
-    }
+    private static final RussianLuceneMorphology russianMorph;
 
     static {
         try {
@@ -25,8 +22,10 @@ public class FindLemmas {
 
     public HashMap<String, Integer> getLemmasInMap(String htmlContent) {
         String[] words = htmlContent
-                .toLowerCase().replaceAll("[^а-я\\s]", " ")
-                .trim().split("\\s+");
+                .toLowerCase()
+                .replaceAll("[^а-я\\s]", " ")
+                .trim()
+                .split("\\s+");
 
         HashMap<String, Integer> lemmas = new HashMap<>();
 

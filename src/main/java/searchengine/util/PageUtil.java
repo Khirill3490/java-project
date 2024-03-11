@@ -1,23 +1,21 @@
-package searchengine.services.impl;
+package searchengine.util;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Component;
 import searchengine.models.*;
 import searchengine.repository.IndexRepository;
 import searchengine.repository.LemmaRepository;
 import searchengine.repository.PageRepository;
-import searchengine.services.EntitiesService;
-import searchengine.util.FindLemmas;
 
 import java.util.*;
 
-@Service
+@Component
 @RequiredArgsConstructor
 @Slf4j
-public class EntitiesServiceImpl implements EntitiesService {
+public class PageUtil {
 
     private final IndexRepository indexRepository;
     private final LemmaRepository lemmaRepository;
@@ -26,7 +24,6 @@ public class EntitiesServiceImpl implements EntitiesService {
 
 
 
-    @Override
     public Page addPage(Site site, String pageUrl, String content, int statusCode) {
         Page page = new Page();
         page.setPath(pageUrl);
@@ -45,7 +42,7 @@ public class EntitiesServiceImpl implements EntitiesService {
         addLemmaAndIndex(page, lemmaList);
     }
 
-    public void addLemmaAndIndex(Page page, HashMap<String, Integer> lemmas) {
+    private void addLemmaAndIndex(Page page, HashMap<String, Integer> lemmas) {
         synchronized (lemmaRepository) {
             for (String s : lemmas.keySet()) {
                 Index index = new Index();

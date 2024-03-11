@@ -12,9 +12,9 @@ import searchengine.exceptions.DataNotFoundException;
 import searchengine.models.*;
 import searchengine.repository.PageRepository;
 import searchengine.repository.SiteRepository;
-import searchengine.services.EntitiesService;
 import searchengine.util.HtmlParserFork;
 import searchengine.services.IndexingService;
+import searchengine.util.PageUtil;
 import searchengine.util.StartThreadIndex;
 
 import java.io.IOException;
@@ -30,7 +30,7 @@ public class IndexingServiceImpl implements IndexingService {
     private final PageRepository pageRepository;
     private final SiteRepository siteRepository;
     private final SitesList sitesList;
-    private final EntitiesService entitiesService;
+    private final PageUtil pageUtil;
     private final searchengine.util.Connection connection;
     private final Pattern pattern = Pattern.compile("(https?://)?([\\w-]+\\.[\\w-]+)[^\\s@]*$");
     private IndexingResponse indexingResponse;
@@ -75,8 +75,8 @@ public class IndexingServiceImpl implements IndexingService {
             if (pageOptional.isPresent()) {
                 site = pageOptional.get().getSiteId();
                 pageRepository.delete(pageOptional.get());
-                Page page = entitiesService.addPage(site, url, content, connect.statusCode());
-                entitiesService.findLemmasInPageText(page);
+                Page page = pageUtil.addPage(site, url, content, connect.statusCode());
+                pageUtil.findLemmasInPageText(page);
                 log.info("Страница " + page.getPath() + " проиндексирована");
                 return new IndexingResponse(true, "Страница проиндексирована");
             }
@@ -84,8 +84,8 @@ public class IndexingServiceImpl implements IndexingService {
                 for (searchengine.config.Site siteCfg : sitesList.getSites()) {
                     if (url.contains(siteCfg.getUrl().replaceAll("(www.)?", ""))) {
                         site = updateOrAddSite(siteCfg, StatusEnum.INDEXED);
-                        Page page = entitiesService.addPage(site, url, content, connect.statusCode());
-                        entitiesService.findLemmasInPageText(page);
+                        Page page = pageUtil.addPage(site, url, content, connect.statusCode());
+                        pageUtil.findLemmasInPageText(page);
                         log.info("Страница " + page.getPath() + " проиндексирована");
                         return new IndexingResponse(true, "Страница проиндексирована");
                     }
@@ -114,7 +114,7 @@ public class IndexingServiceImpl implements IndexingService {
         Thread thread = new Thread(() -> {
             ExecutorService executorService = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
             for (searchengine.config.Site siteCfg : sitesList.getSites()) {
-                executorService.execute(new StartThreadIndex(entitiesService, siteRepository, connection, siteCfg));
+                executorService.execute(new StartThreadIndex(pageUtil, siteRepository, connection, siteCfg));
             }
             executorService.shutdown();
         });

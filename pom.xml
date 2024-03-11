@@ -12,6 +12,15 @@
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
     </properties>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <version>3.2.3</version>
+            </plugin>
+        </plugins>
+    </build>
 
     <parent>
         <groupId>org.springframework.boot</groupId>
@@ -48,9 +57,6 @@
             <version>8.0.0.Final</version>
         </dependency>
 
-
-
-
         <dependency>
             <groupId>org.jsoup</groupId>
             <artifactId>jsoup</artifactId>
@@ -77,8 +83,6 @@
             <version>2.3</version>
         </dependency>
 
-
-
         <dependency>
             <groupId>org.apache.lucene.morphology</groupId>
             <artifactId>morph</artifactId>
@@ -104,10 +108,6 @@
             <artifactId>russian</artifactId>
             <version>1.5</version>
         </dependency>
-
-
-
-
 
     </dependencies>
 

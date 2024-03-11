@@ -33,7 +33,8 @@ public class SearchServiceImpl implements SearchService {
     public SearchingResponse startSearch(String query, String site, Integer offset, Integer limit) {
         if (limit < 1)  {
             throw new BadRequestException("limit не может быть меньше 1");
-        } if (query.isEmpty()) {
+        }
+        if (query.isEmpty()) {
             throw new BadRequestException("Задан пустой поисковый запрос");
         }
         SearchingResponse searchingResponse = new SearchingResponse();
