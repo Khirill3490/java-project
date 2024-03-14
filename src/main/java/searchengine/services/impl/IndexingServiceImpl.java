@@ -111,14 +111,16 @@ public class IndexingServiceImpl implements IndexingService {
 
     public void indexing() {
         HtmlParserFork.stop.set(false);
-        Thread thread = new Thread(() -> {
-            ExecutorService executorService = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
-            for (searchengine.config.Site siteCfg : sitesList.getSites()) {
+        ExecutorService executorService = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+        for (searchengine.config.Site siteCfg : sitesList.getSites()) {
+            try {
                 executorService.execute(new StartThreadIndex(pageUtil, siteRepository, connection, siteCfg));
+            } catch (Exception e) {
+                log.error("Ошибка при выполнении потока: " + e.getMessage());
+                e.printStackTrace();
             }
-            executorService.shutdown();
-        });
-        thread.start();
+        }
+        executorService.shutdown();
     }
 
     public Site updateOrAddSite(searchengine.config.Site siteCfg, StatusEnum statusEnum) {
